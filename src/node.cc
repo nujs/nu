@@ -940,7 +940,7 @@ Handle<Value> MakeDomainCallback(Environment* env,
     return ret;
   }
 
-  if (tick_info->in_tick() == 1) {
+  if (tick_info->in_tick()) {
     return ret;
   }
 
@@ -949,12 +949,17 @@ Handle<Value> MakeDomainCallback(Environment* env,
     return ret;
   }
 
+  tick_info->set_in_tick(true);
+
   // process nextTicks after call
   Local<Object> process_object = env->process_object();
   Local<Function> tick_callback_function = env->tick_callback_function();
   tick_callback_function->Call(process_object, 0, NULL);
 
+  tick_info->set_in_tick(false);
+
   if (try_catch.HasCaught()) {
+    tick_info->set_last_threw(true);
     return Undefined(node_isolate);
   }
 
@@ -996,6 +1001,8 @@ Handle<Value> MakeCallback(Environment* env,
     return ret;
   }
 
+  tick_info->set_in_tick(true);
+
   // lazy load no domain next tick callbacks
   Local<Function> tick_callback_function = env->tick_callback_function();
   if (tick_callback_function.IsEmpty()) {
@@ -1013,7 +1020,10 @@ Handle<Value> MakeCallback(Environment* env,
   // process nextTicks after call
   tick_callback_function->Call(process_object, 0, NULL);
 
+  tick_info->set_in_tick(false);
+
   if (try_catch.HasCaught()) {
+    tick_info->set_last_threw(true);
     return Undefined(node_isolate);
   }
 
