@@ -19,55 +19,36 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef SRC_REQ_WRAP_H_
-#define SRC_REQ_WRAP_H_
 
-#include "async-wrap.h"
-#include "async-wrap-inl.h"
-#include "env.h"
-#include "env-inl.h"
-#include "queue.h"
-#include "util.h"
+var common = require('../common');
+var assert = require('assert');
+var active = null;
+var cntr = 0;
 
-namespace node {
 
-// defined in node.cc
-extern QUEUE req_wrap_queue;
-
-template <typename T>
-class ReqWrap : public AsyncWrap {
- public:
-  ReqWrap(Environment* env, v8::Handle<v8::Object> object)
-      : AsyncWrap(env, object) {
-    assert(!object.IsEmpty());
-
-    if (env->in_domain())
-      object->Set(env->domain_string(), env->domain_array()->Get(0));
-
-    QUEUE_INSERT_TAIL(&req_wrap_queue, &req_wrap_queue_);
+process.addAsyncListener(function() {
+  return { val: ++cntr };
+}, {
+  before: function(context, domain) {
+    active = domain.val;
+  },
+  after: function(context, domain) {
+    active = null;
   }
+});
 
 
-  ~ReqWrap() {
-    QUEUE_REMOVE(&req_wrap_queue_);
-    // Assert that someone has called Dispatched()
-    assert(req_.data == this);
-    assert(!persistent().IsEmpty());
-    persistent().Dispose();
-  }
-
-  // Call this after the req has been dispatched.
-  void Dispatched() {
-    req_.data = this;
-  }
-
-  // TODO(bnoordhuis) Make these private.
-  QUEUE req_wrap_queue_;
-  T req_;  // *must* be last, GetActiveRequests() in node.cc depends on it
-};
+process.nextTick(function() {
+  assert.equal(active, 1);
+  process.nextTick(function() {
+    assert.equal(active, 3);
+  });
+});
 
 
-}  // namespace node
-
-
-#endif  // SRC_REQ_WRAP_H_
+process.nextTick(function() {
+  assert.equal(active, 2);
+  process.nextTick(function() {
+    assert.equal(active, 4);
+  });
+});
