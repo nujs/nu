@@ -830,7 +830,7 @@ int SSLWrap<Base>::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
   HandleScope scope(node_isolate);
 
   Base* w = static_cast<Base*>(SSL_get_app_data(s));
-  Environment* env = w->env();
+  Environment* env = w->ssl_env();
 
   if (!w->session_callbacks_)
     return 0;
@@ -851,11 +851,7 @@ int SSLWrap<Base>::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
                                       reinterpret_cast<char*>(sess->session_id),
                                       sess->session_id_length);
   Local<Value> argv[] = { session, buff };
-  MakeCallback(env,
-               w->weak_object(node_isolate),
-               env->onnewsession_string(),
-               ARRAY_SIZE(argv),
-               argv);
+  w->MakeCallback(env->onnewsession_string(), ARRAY_SIZE(argv), argv);
 
   return 0;
 }
@@ -867,7 +863,7 @@ void SSLWrap<Base>::OnClientHello(void* arg,
   HandleScope scope(node_isolate);
 
   Base* w = static_cast<Base*>(arg);
-  Environment* env = w->env();
+  Environment* env = w->ssl_env();
 
   Local<Object> hello_obj = Object::New();
   Local<Object> buff = Buffer::New(
@@ -886,11 +882,7 @@ void SSLWrap<Base>::OnClientHello(void* arg,
   hello_obj->Set(env->tls_ticket_string(), Boolean::New(hello.has_ticket()));
 
   Local<Value> argv[] = { hello_obj };
-  MakeCallback(env,
-               w->weak_object(node_isolate),
-               env->onclienthello_string(),
-               ARRAY_SIZE(argv),
-               argv);
+  w->MakeCallback(env->onclienthello_string(), ARRAY_SIZE(argv), argv);
 }
 
 
@@ -902,7 +894,7 @@ void SSLWrap<Base>::GetPeerCertificate(
 
   Base* w = NULL;
   NODE_UNWRAP(args.This(), Base, w);
-  Environment* env = w->env();
+  Environment* env = w->ssl_env();
 
   Local<Object> info = Object::New();
   X509* peer_cert = SSL_get_peer_certificate(w->ssl_);
@@ -1098,7 +1090,7 @@ void SSLWrap<Base>::LoadSession(const FunctionCallbackInfo<Value>& args) {
 
   Base* w = NULL;
   NODE_UNWRAP(args.This(), Base, w);
-  Environment* env = w->env();
+  Environment* env = w->ssl_env();
 
   if (args.Length() >= 1 && Buffer::HasInstance(args[0])) {
     ssize_t slen = Buffer::Length(args[0]);
@@ -1254,7 +1246,7 @@ void SSLWrap<Base>::GetCurrentCipher(const FunctionCallbackInfo<Value>& args) {
 
   Base* w = NULL;
   NODE_UNWRAP(args.This(), Base, w);
-  Environment* env = w->env();
+  Environment* env = w->ssl_env();
 
   OPENSSL_CONST SSL_CIPHER* c = SSL_get_current_cipher(w->ssl_);
   if (c == NULL)
@@ -1430,8 +1422,7 @@ int Connection::HandleBIOError(BIO *bio, const char* func, int rv) {
     HandleScope scope(node_isolate);
     Local<Value> exception =
         Exception::Error(OneByteString(node_isolate, ssl_error_buf));
-    weak_object(node_isolate)->Set(
-        FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
+    object()->Set(FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
 
     DEBUG_PRINT("[%p] BIO: %s failed: (%d) %s\n",
                 ssl_,
@@ -1474,8 +1465,7 @@ int Connection::HandleSSLError(const char* func,
   } else if (err == SSL_ERROR_ZERO_RETURN) {
     Local<Value> exception =
         Exception::Error(FIXED_ONE_BYTE_STRING(node_isolate, "ZERO_RETURN"));
-    weak_object(node_isolate)->Set(
-        FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
+    object()->Set(FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
     return rv;
 
   } else if (err == SSL_ERROR_SYSCALL && ss == kIgnoreSyscall) {
@@ -1499,8 +1489,7 @@ int Connection::HandleSSLError(const char* func,
       BIO_get_mem_ptr(bio, &mem);
       Local<Value> exception =
           Exception::Error(OneByteString(node_isolate, mem->data, mem->length));
-      weak_object(node_isolate)->Set(
-          FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
+      object()->Set(FIXED_ONE_BYTE_STRING(node_isolate, "error"), exception);
       BIO_free_all(bio);
     }
 
@@ -1517,7 +1506,7 @@ void Connection::ClearError() {
 
   // We should clear the error in JS-land
   Local<String> error_key = FIXED_ONE_BYTE_STRING(node_isolate, "error");
-  Local<Value> error = weak_object(node_isolate)->Get(error_key);
+  Local<Value> error = object()->Get(error_key);
   assert(error->BooleanValue() == false);
 #endif  // NDEBUG
 }
@@ -1531,13 +1520,13 @@ void Connection::SetShutdownFlags() {
   if (flags & SSL_SENT_SHUTDOWN) {
     Local<String> sent_shutdown_key =
         FIXED_ONE_BYTE_STRING(node_isolate, "sentShutdown");
-    weak_object(node_isolate)->Set(sent_shutdown_key, True(node_isolate));
+    object()->Set(sent_shutdown_key, True(node_isolate));
   }
 
   if (flags & SSL_RECEIVED_SHUTDOWN) {
     Local<String> received_shutdown_key =
         FIXED_ONE_BYTE_STRING(node_isolate, "receivedShutdown");
-    weak_object(node_isolate)->Set(received_shutdown_key, True(node_isolate));
+    object()->Set(received_shutdown_key, True(node_isolate));
   }
 }
 
@@ -1642,10 +1631,8 @@ int Connection::SelectSNIContextCallback_(SSL *s, int *ad, void* arg) {
     if (!conn->sniObject_.IsEmpty()) {
       conn->sniContext_.Dispose();
 
-      Local<Object> sni_object =
-          PersistentToLocal(node_isolate, conn->sniObject_);
       Local<Value> arg = PersistentToLocal(node_isolate, conn->servername_);
-      Local<Value> ret = MakeCallback(env, sni_object, "onselect", 1, &arg);
+      Local<Value> ret = conn->MakeCallback(env->onselect_string(), 1, &arg);
 
       // If ret is SecureContext
       Local<FunctionTemplate> secure_context_constructor_template =
@@ -1764,15 +1751,11 @@ void Connection::SSLInfoCallback(const SSL *ssl_, int where, int ret) {
   HandleScope handle_scope(env->isolate());
 
   if (where & SSL_CB_HANDSHAKE_START) {
-    MakeCallback(env,
-                 conn->weak_object(node_isolate),
-                 env->onhandshakestart_string());
+    conn->MakeCallback(env->onhandshakestart_string(), 0, NULL);
   }
 
   if (where & SSL_CB_HANDSHAKE_DONE) {
-    MakeCallback(env,
-                 conn->weak_object(node_isolate),
-                 env->onhandshakedone_string());
+    conn->MakeCallback(env->onhandshakedone_string(), 0, NULL);
   }
 }
 
@@ -2086,7 +2069,8 @@ void CipherBase::Initialize(Environment* env, Handle<Object> target) {
 void CipherBase::New(const FunctionCallbackInfo<Value>& args) {
   assert(args.IsConstructCall() == true);
   CipherKind kind = args[0]->IsTrue() ? kCipher : kDecipher;
-  new CipherBase(args.GetIsolate(), args.This(), kind);
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  new CipherBase(env, args.This(), kind);
 }
 
 
@@ -2327,7 +2311,8 @@ void Hmac::Initialize(Environment* env, v8::Handle<v8::Object> target) {
 
 
 void Hmac::New(const FunctionCallbackInfo<Value>& args) {
-  new Hmac(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  new Hmac(env, args.This());
 }
 
 
@@ -2464,7 +2449,8 @@ void Hash::New(const FunctionCallbackInfo<Value>& args) {
 
   const String::Utf8Value hash_type(args[0]);
 
-  Hash* hash = new Hash(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  Hash* hash = new Hash(env, args.This());
   if (!hash->HashInit(*hash_type)) {
     return ThrowError("Digest method not supported");
   }
@@ -2563,7 +2549,8 @@ void Sign::Initialize(Environment* env, v8::Handle<v8::Object> target) {
 
 
 void Sign::New(const FunctionCallbackInfo<Value>& args) {
-  new Sign(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  new Sign(env, args.This());
 }
 
 
@@ -2708,7 +2695,8 @@ void Verify::Initialize(Environment* env, v8::Handle<v8::Object> target) {
 
 
 void Verify::New(const FunctionCallbackInfo<Value>& args) {
-  new Verify(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  new Verify(env, args.This());
 }
 
 
@@ -2965,8 +2953,8 @@ void DiffieHellman::DiffieHellmanGroup(
     const FunctionCallbackInfo<Value>& args) {
   HandleScope scope(node_isolate);
 
-  DiffieHellman* diffieHellman =
-      new DiffieHellman(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  DiffieHellman* diffieHellman = new DiffieHellman(env, args.This());
 
   if (args.Length() != 1 || !args[0]->IsString()) {
     return ThrowError("No group name given");
@@ -2993,8 +2981,9 @@ void DiffieHellman::DiffieHellmanGroup(
 void DiffieHellman::New(const FunctionCallbackInfo<Value>& args) {
   HandleScope scope(node_isolate);
 
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
   DiffieHellman* diffieHellman =
-      new DiffieHellman(args.GetIsolate(), args.This());
+      new DiffieHellman(env, args.This());
   bool initialized = false;
 
   if (args.Length() > 0) {
@@ -3320,7 +3309,7 @@ void EIO_PBKDF2After(uv_work_t* work_req, int status) {
   req->obj.Dispose();
   Local<Value> argv[2];
   EIO_PBKDF2After(req, argv);
-  MakeCallback(env, obj, "ondone", ARRAY_SIZE(argv), argv);
+  MakeCallback(env, obj, env->ondone_string(), ARRAY_SIZE(argv), argv);
 }
 
 
@@ -3499,7 +3488,7 @@ void RandomBytesAfter(uv_work_t* work_req, int status) {
   Local<Value> argv[2];
   RandomBytesCheck(req, argv);
   Local<Object> obj = PersistentToLocal(node_isolate, req->obj_);
-  MakeCallback(env, obj, "ondone", ARRAY_SIZE(argv), argv);
+  MakeCallback(env, obj, env->ondone_string(), ARRAY_SIZE(argv), argv);
   delete req;
 }
 
@@ -3631,7 +3620,8 @@ void Certificate::Initialize(Handle<Object> target) {
 
 
 void Certificate::New(const FunctionCallbackInfo<Value>& args) {
-  new Certificate(args.GetIsolate(), args.This());
+  Environment* env = Environment::GetCurrent(args.GetIsolate());
+  new Certificate(env, args.This());
 }
 
 

@@ -34,7 +34,6 @@ namespace node {
 class StatWatcher : public WeakObject {
  public:
   static void Initialize(v8::Handle<v8::Object> target);
-  inline Environment* env() const { return env_; }
 
  protected:
   StatWatcher(Environment* env, v8::Local<v8::Object> wrap);
@@ -52,7 +51,6 @@ class StatWatcher : public WeakObject {
   void Stop();
 
   uv_fs_poll_t* watcher_;
-  Environment* const env_;
 };
 
 }  // namespace node
