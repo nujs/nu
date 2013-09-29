@@ -29,13 +29,17 @@
 
   function startup() {
     var EventEmitter = NativeModule.require('events').EventEmitter;
+    var Resource = NativeModule.require('events').Resource;
 
-    process.__proto__ = Object.create(EventEmitter.prototype, {
+    process.__proto__ = Object.create(Resource.prototype, {
       constructor: {
         value: process.constructor
       }
     });
-    EventEmitter.call(process);
+    Resource.call(process);
+
+    process._end = function() { };
+    process._callback = function() { };
 
     process.EventEmitter = EventEmitter; // process.EventEmitter is deprecated
 
@@ -161,6 +165,7 @@
 
   startup.globalVariables = function() {
     global.process = process;
+    global.currentTask = process;
     global.global = global;
     global.GLOBAL = global;
     global.root = global;
@@ -284,6 +289,7 @@
     var kLength = 3;
 
     process.nextTick = nextTick;
+    process.nextTickInternal = nextTickInternal;
     // needs to be accessible from cc land
     process._tickCallback = _tickCallback;
     process._tickDomainCallback = _tickDomainCallback;
@@ -350,7 +356,14 @@
       tickDone();
     }
 
+    var task;
     function nextTick(callback) {
+      if (task === undefined)
+        task = NativeModule.require('task');
+      return new task.TickTask(callback);
+    }
+
+    function nextTickInternal(callback) {
       // on the way out, don't bother. it won't get fired anyway.
       if (process._exiting)
         return;
@@ -623,7 +636,7 @@
       if (isSignal(type)) {
         assert(signalWraps.hasOwnProperty(type));
 
-        if (this.listeners(type).length === 0) {
+        if (this.listenerCount(type) === 0) {
           signalWraps[type].close();
           delete signalWraps[type];
         }

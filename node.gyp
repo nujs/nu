@@ -20,6 +20,7 @@
     'library_files': [
       'src/node.js',
       'lib/_debugger.js',
+      'lib/_inherits.js',
       'lib/_linklist.js',
       'lib/assert.js',
       'lib/buffer.js',
@@ -59,6 +60,7 @@
       'lib/_stream_passthrough.js',
       'lib/string_decoder.js',
       'lib/sys.js',
+      'lib/task.js',
       'lib/timers.js',
       'lib/tls.js',
       'lib/_tls_legacy.js',
@@ -152,6 +154,7 @@
         '<@(library_files)',
         # node.gyp is added to the project by default.
         'common.gypi',
+        'test.js'
       ],
 
       'defines': [
