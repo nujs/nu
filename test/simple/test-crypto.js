@@ -948,3 +948,6 @@ assert.throws(function() {
 assert.throws(function() {
   crypto.createVerify('RSA-SHA1').update('0', 'hex');
 }, /Bad input string/);
+
+// Make sure memory isn't released before being returned
+console.log(crypto.randomBytes(16));
