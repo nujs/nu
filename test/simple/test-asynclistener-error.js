@@ -22,6 +22,7 @@
 
 var common = require('../common');
 var assert = require('assert');
+var dns = require('dns');
 var fs = require('fs');
 var net = require('net');
 var addListener = process.addAsyncListener;
@@ -49,9 +50,12 @@ var callbacksObj = {
       case 'setInterval - nested':
       case 'fs - file does not exist':
       case 'fs - nested file does not exist':
+      case 'fs - exists':
+      case 'fs - realpath':
       case 'net - connection listener':
       case 'net - server listening':
       case 'net - client connect':
+      case 'dns - lookup':
         return true;
 
       default:
@@ -149,6 +153,16 @@ process.nextTick(function() {
   });
   expectCaught++;
 
+  fs.exists('hi all', function(exists) {
+    throw new Error('fs - exists');
+  });
+  expectCaught++;
+
+  fs.realpath('/some/path', function(err, resolved) {
+    throw new Error('fs - realpath');
+  });
+  expectCaught++;
+
   removeListener(listener);
 });
 
@@ -188,12 +202,25 @@ process.nextTick(function() {
   server.listen(common.PORT, function() {
     var client = net.connect(common.PORT, function() {
       client.end();
-      expectCaught++;
       throw new Error('net - client connect');
     });
     expectCaught++;
     throw new Error('net - server listening');
   });
+  expectCaught++;
+
+  removeListener(listener);
+});
+
+
+// DNS
+process.nextTick(function() {
+  addListener(listener);
+
+  dns.lookup('localhost', function() {
+    throw new Error('dns - lookup');
+  });
+  expectCaught++;
 
   removeListener(listener);
 });

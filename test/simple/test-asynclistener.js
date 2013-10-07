@@ -35,6 +35,8 @@ var expectAsync = 0;
 process.on('exit', function() {
   process._rawDebug('expected', expectAsync);
   process._rawDebug('actual  ', actualAsync);
+  // TODO(trevnorris): Not a great test. If one was missed, but others
+  // overflowed then the test would still pass.
   assert.ok(actualAsync >= expectAsync);
 });
 
@@ -119,6 +121,22 @@ process.nextTick(function() {
   });
   expectAsync++;
 
+  removeListener(listener);
+});
+
+
+// Test triggers with two async listeners
+process.nextTick(function() {
+  addListener(listener);
+  addListener(listener);
+
+  setTimeout(function() {
+    process.nextTick(function() { });
+    expectAsync += 2;
+  });
+  expectAsync += 2;
+
+  removeListener(listener);
   removeListener(listener);
 });
 
