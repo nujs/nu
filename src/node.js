@@ -224,9 +224,6 @@
       // First run through error handlers from asyncListener.
       var caught = _errorHandler(er);
 
-      if (process.domain && process.domain._errorHandler)
-        caught = process.domain._errorHandler(er) || caught;
-
       if (!caught)
         caught = process.emit('uncaughtException', er);
 
@@ -547,10 +544,13 @@
     var kIndex = 0;
     var kLength = 1;
 
+    // For asyncFlags.
+    // *Must* match Environment::AsyncListeners::Fields in src/env.h
+    var kCount = 0;
+
     process.nextTick = nextTick;
     // Needs to be accessible from beyond this scope.
     process._tickCallback = _tickCallback;
-    process._tickDomainCallback = _tickDomainCallback;
 
     process._setupNextTick(tickInfo, _tickCallback);
 
@@ -593,35 +593,6 @@
       tickDone();
     }
 
-    function _tickDomainCallback() {
-      var callback, domain, hasQueue, threw, tock;
-
-      while (tickInfo[kIndex] < tickInfo[kLength]) {
-        tock = nextTickQueue[tickInfo[kIndex]++];
-        callback = tock.callback;
-        domain = tock.domain;
-        hasQueue = !!tock._asyncQueue;
-        if (hasQueue)
-          _loadAsyncQueue(tock);
-        if (domain)
-          domain.enter();
-        threw = true;
-        try {
-          callback();
-          threw = false;
-        } finally {
-          if (threw)
-            tickDone();
-        }
-        if (hasQueue)
-          _unloadAsyncQueue(tock);
-        if (domain)
-          domain.exit();
-      }
-
-      tickDone();
-    }
-
     function nextTick(callback) {
       // on the way out, don't bother. it won't get fired anyway.
       if (process._exiting)
@@ -629,11 +600,10 @@
 
       var obj = {
         callback: callback,
-        domain: process.domain || null,
         _asyncQueue: undefined
       };
 
-      if (asyncFlags[0] > 0)
+      if (asyncFlags[kCount] > 0)
         _runAsyncQueue(obj);
 
       nextTickQueue.push(obj);
