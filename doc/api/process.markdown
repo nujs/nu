@@ -648,3 +648,107 @@ a diff reading, useful for benchmarks and measuring intervals:
     }, 1000);
 
 [EventEmitter]: events.html#events_class_events_eventemitter
+
+
+## process.createAsyncListener(asyncListener[, callbacksObj[, storageValue]])
+
+* `asyncListener` {Function}
+* `callbacksObj` {Object}
+* `storageValue` {Value}
+
+Returns a constructed `AsyncListener` object. Which can then be passed to
+`process.addAsyncListener()` and `process.removeAsyncListener()`. Each
+function parameter is as follows:
+
+`asyncListener(storageValue)`: A `Function` called as an asynchronous
+event is instantiated. If a `Value` is returned then it will be attached
+to the event and overwrite any value that had been passed to
+`createAsyncListener()`'s `storageValue` argument. If an initial
+`storageValue` was passed when created, then `asyncListener()` will
+receive that as a function argument.
+
+`callbacksObj`: An `Object` which may contain three optional fields:
+
+* `before(context, storageValue)`: A `Function` that is called immediately
+before the asynchronous callback is about to run. It will be passed both
+the `context` (i.e. `this`) of the calling function and the `storageValue`
+either returned from `asyncListener` or passed during construction (if
+either occurred).
+
+* `after(context, storageValue)`: A `Function` called immediately after
+the asynchronous event's callback has run. Note that if the event's
+callback throws during execution this is will not be called if the error
+is not handled.
+
+* `error(storageValue, error)`: A `Function` called if the event's
+callback threw. If `error` returns `true` then Node will assume the error
+has been properly handled and resume execution normally. In the case
+multiple `error()` callbacks have been registered, only **one** of those
+callbacks needs to return `true` for `AsyncListener` to accept that the
+error has been handled.
+
+`storageValue`: A `Value` (i.e. anything) that will be, by default,
+attached to all new event instances. This will be overwritten if a `Value`
+is returned by `asyncListener()`.
+
+**Note:** The `EventEmitter`, while used to emit status of an asynchronous
+event, is not itself asynchronous. So `asyncListener()` will not fire when
+an event is added, and `before`/`after` will not fire when emitted
+callbacks are called.
+
+Simple usage:
+
+    var cntr = 0;
+    var key = process.createAsyncListener(function() {
+      return { uid: cntr++ };
+    }, {
+      before: function onBefore(context, storage) {
+        // Need to remove the listener while logging or will end up
+        // with an infinite call loop.
+        process.removeAsyncListener(key);
+        console.log('uid: %s is about to run', storage.uid);
+        process.addAsyncListener(key);
+      },
+      after: function onAfter(context, storage) {
+        process.removeAsyncListener(key);
+        console.log('uid: %s is about to run', storage.uid);
+        process.addAsyncListener(key);
+      },
+      error: function onError(storage, err) {
+        // Handle known errors
+        if (err.message === 'really, it\'s ok') {
+          process.removeAsyncListener(key);
+          console.log('handled error just threw:');
+          console.log(err.stack);
+          process.addAsyncListener(key);
+          return true;
+        }
+      }
+    });
+
+    process.addAsyncListener(key);
+
+    process.nextTick(function() {
+      throw new Error('really, it\'s ok');
+    });
+
+    // Output:
+    // uid: 0 is about to run
+    // handled error just threw:
+    // Error: really, it's ok
+    //     at /tmp/test2.js:27:9
+    //     at process._tickCallback (node.js:583:11)
+    //     at Function.Module.runMain (module.js:492:11)
+    //     at startup (node.js:123:16)
+    //     at node.js:1012:3
+
+
+## process.addAsyncListener(asyncListener[, callbacksObj[, storageValue]])
+## process.addAsyncListener(asyncListener)
+
+Returns a constructed `AsyncListener` object and immediately adds it to
+the listening queue.
+
+## process.removeAsyncListener(asyncListener)
+
+Removes the `asyncListener` from the listening queue.
