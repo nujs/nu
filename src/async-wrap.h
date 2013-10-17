@@ -43,9 +43,9 @@ class AsyncWrap {
 
   inline uint32_t async_flags() const;
 
-  inline void set_flag(int flag);
+  inline void set_flag(unsigned int flag);
 
-  inline void remove_flag(int flag);
+  inline void remove_flag(unsigned int flag);
 
   inline bool has_async_queue();
 

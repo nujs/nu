@@ -843,12 +843,12 @@ void SetupAsyncListener(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args.GetIsolate());
   HandleScope handle_scope(args.GetIsolate());
 
-  assert(args[0]->IsObject() &&
-         args[1]->IsFunction() &&
-         args[2]->IsFunction() &&
-         args[3]->IsFunction() &&
-         args[4]->IsFunction() &&
-         args[5]->IsFunction());
+  assert(args[0]->IsObject());
+  assert(args[1]->IsFunction());
+  assert(args[2]->IsFunction());
+  assert(args[3]->IsFunction());
+  assert(args[4]->IsFunction());
+  assert(args[5]->IsFunction());
 
   env->set_async_listener_run_function(args[1].As<Function>());
   env->set_async_listener_load_function(args[2].As<Function>());

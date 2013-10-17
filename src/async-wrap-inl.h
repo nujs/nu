@@ -71,12 +71,12 @@ inline uint32_t AsyncWrap::async_flags() const {
 }
 
 
-inline void AsyncWrap::set_flag(int flag) {
+inline void AsyncWrap::set_flag(unsigned int flag) {
   async_flags_ |= flag;
 }
 
 
-inline void AsyncWrap::remove_flag(int flag) {
+inline void AsyncWrap::remove_flag(unsigned int flag) {
   async_flags_ &= ~flag;
 }
 

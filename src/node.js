@@ -295,30 +295,28 @@
     // instantiated.
     function runAsyncQueue(context) {
       var queue = [];
-      var queue_item, item, i, value;
+      var queueItem, item, i, value;
 
       inAsyncTick = true;
       for (i = 0; i < asyncQueue.length; i++) {
-        queue_item = asyncQueue[i];
-        // TODO(trevnorris): I should only have to create this object if
-        // the value field changes.
-        item = {
-          callbacks: queue_item.callbacks,
-          value: queue_item.value,
-          listener: queue_item.listener,
-          uid: queue_item.uid
-        };
+        queueItem = asyncQueue[i];
         // Not passing "this" context because it hasn't actually been
         // instantiated yet, so accessing some of the object properties
         // can cause a segfault.
         // Passing the original value will allow users to manipulate the
         // original value object, while also allowing them to return a
         // new value for current async call tracking.
-        value = item.listener(queue_item.value);
-        if (typeof value !== 'undefined')
-          item.value = value;
-        // TODO(trevnorris): Optimize. Most cases there will only be a
-        // single listener, so no need to create an array.
+        value = queueItem.listener(queueItem.value);
+        if (typeof value !== 'undefined') {
+          item = {
+            callbacks: queueItem.callbacks,
+            value: value,
+            listener: queueItem.listener,
+            uid: queueItem.uid
+          };
+        } else {
+          item = queueItem;
+        }
         queue[i] = item;
       }
       inAsyncTick = false;
@@ -399,6 +397,7 @@
 
       // Make sure the callback doesn't already exist in the queue.
       var inQueue = false;
+      // The asyncQueue will be small. Probably always <= 3 items.
       for (var i = 0; i < asyncQueue.length; i++) {
         if (callbacks.uid === asyncQueue[i].uid) {
           inQueue = true;

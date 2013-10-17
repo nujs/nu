@@ -660,7 +660,7 @@ Returns a constructed `AsyncListener` object. Which can then be passed to
 `process.addAsyncListener()` and `process.removeAsyncListener()`. Each
 function parameter is as follows:
 
-`asyncListener(storageValue)`: A `Function` called as an asynchronous
+`asyncListener(storageValue)`: A `Function` called when an asynchronous
 event is instantiated. If a `Value` is returned then it will be attached
 to the event and overwrite any value that had been passed to
 `createAsyncListener()`'s `storageValue` argument. If an initial
@@ -676,16 +676,15 @@ either returned from `asyncListener` or passed during construction (if
 either occurred).
 
 * `after(context, storageValue)`: A `Function` called immediately after
-the asynchronous event's callback has run. Note that if the event's
-callback throws during execution this is will not be called if the error
-is not handled.
+the asynchronous event's callback has run. Note this will not be called
+if the callback throws and the error is not handled.
 
 * `error(storageValue, error)`: A `Function` called if the event's
 callback threw. If `error` returns `true` then Node will assume the error
-has been properly handled and resume execution normally. In the case
-multiple `error()` callbacks have been registered, only **one** of those
-callbacks needs to return `true` for `AsyncListener` to accept that the
-error has been handled.
+has been properly handled and resume execution normally. When multiple
+`error()` callbacks have been registered, only **one** of those callbacks
+needs to return `true` for `AsyncListener` to accept that the error has
+been handled.
 
 `storageValue`: A `Value` (i.e. anything) that will be, by default,
 attached to all new event instances. This will be overwritten if a `Value`
