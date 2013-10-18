@@ -61,7 +61,9 @@ void WeakObject::WeakCallback(v8::Isolate* isolate,
                               WeakObject* self) {
   // Dispose now instead of in the destructor to avoid child classes that call
   // `delete this` in their destructor from blowing up.
-  persistent->Dispose();
+  // Dispose the class member instead of the argument or else the IsEmpty()
+  // check in ~AsyncWrap will fail.
+  self->persistent().Dispose();
   delete self;
 }
 

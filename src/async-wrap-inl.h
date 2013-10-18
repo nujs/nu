@@ -52,6 +52,7 @@ inline AsyncWrap::AsyncWrap(Environment* env, v8::Handle<v8::Object> object)
 
 
 inline AsyncWrap::~AsyncWrap() {
+  assert(persistent().IsEmpty());
 }
 
 
