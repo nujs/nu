@@ -331,7 +331,7 @@
 
       asyncStack.push(asyncQueue);
       asyncQueue = queue;
-      // Since the the async listener callback is required, the number of
+      // Since the async listener callback is required, the number of
       // objects in the asyncQueue implies the number of async listeners
       // there are to be processed.
       asyncFlags[kCount] = queue.length;
@@ -369,7 +369,7 @@
       if (asyncStack.length > 0)
         asyncQueue = asyncStack.pop();
       else
-        asyncQueue = [];
+        asyncQueue.length = 0;
 
       asyncFlags[kCount] = asyncQueue.length;
 
@@ -470,22 +470,22 @@
 
     // Used by AsyncWrap::AddAsyncListener() to add an individual listener
     // to the async queue. It will check the uid of the listener and only
-    // allow it to be added once.
-    function pushListener(obj) {
+    // allow it to be added once. (gul => global unique listener)
+    function pushListener(gul) {
       if (!this._asyncQueue)
         this._asyncQueue = [];
 
       var queue = this._asyncQueue;
       var inQueue = false;
       for (var i = 0; i < queue.length; i++) {
-        if (obj.uid === queue.uid) {
+        if (gul.uid === queue.uid) {
           inQueue = true;
           break;
         }
       }
 
       if (!inQueue)
-        queue.push(obj);
+        queue.push(gul);
     }
 
     // Used by AsyncWrap::RemoveAsyncListener() to remove an individual

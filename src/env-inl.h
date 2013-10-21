@@ -71,7 +71,8 @@ inline v8::Isolate* Environment::IsolateData::isolate() const {
 }
 
 inline Environment::AsyncListener::AsyncListener() {
-  for (int i = 0; i < kFieldsCount; ++i) fields_[i] = 0;
+  for (int i = 0; i < kFieldsCount; ++i)
+    fields_[i] = 0;
 }
 
 inline uint32_t* Environment::AsyncListener::fields() {
@@ -87,7 +88,8 @@ inline uint32_t Environment::AsyncListener::count() const {
 }
 
 inline Environment::TickInfo::TickInfo() : in_tick_(false), last_threw_(false) {
-  for (int i = 0; i < kFieldsCount; ++i) fields_[i] = 0;
+  for (int i = 0; i < kFieldsCount; ++i)
+    fields_[i] = 0;
 }
 
 inline uint32_t* Environment::TickInfo::fields() {
