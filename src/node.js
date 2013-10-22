@@ -224,7 +224,9 @@
       // First run through error handlers from asyncListener.
       var caught = _errorHandler(er);
 
-      if (!caught)
+      // Only run uncaughtException callbacks if there were no error
+      // callbacks in the asyncQueue.
+      if (caught === null)
         caught = process.emit('uncaughtException', er);
 
       // If someone handled it, then great.  otherwise, die in C++ land
@@ -260,9 +262,9 @@
     // Prevent accidentally suppressed thrown errors from before/after.
     var inAsyncTick = false;
 
-    // To prevent infinite recursion when an error handler also throws
-    // flag when an error is currenly being handled.
-    var inErrorTick = false;
+    // If an "error" callback throws then we'll hang onto the stack so it
+    // can be reported to the user after calling them one last time.
+    var errorString;
 
     // Needs to be the same as src/env.h
     var kCount = 0;
@@ -290,6 +292,13 @@
                                 unloadAsyncQueue,
                                 pushListener,
                                 stripListener);
+
+    function popQueue() {
+      if (asyncStack.length > 0)
+        asyncQueue = asyncStack.pop();
+      else
+        asyncQueue.length = 0;
+    }
 
     // Run all the async listeners attached when an asynchronous event is
     // instantiated.
@@ -366,10 +375,8 @@
       }
       inAsyncTick = false;
 
-      if (asyncStack.length > 0)
-        asyncQueue = asyncStack.pop();
-      else
-        asyncQueue.length = 0;
+      // Unload the current queue from the stack.
+      popQueue();
 
       asyncFlags[kCount] = asyncQueue.length;
 
@@ -387,7 +394,7 @@
       };
     }
 
-    // Add a listener to the current stack.
+    // Add a listener to the current queue.
     function addAsyncListener(listener, callbacks, value) {
       // Accept new listeners or previous created listeners.
       if (typeof listener === 'function')
@@ -441,27 +448,31 @@
       var handled = null;
       var error, item, i;
 
-      if (inErrorTick)
-        return false;
-
-      inErrorTick = true;
       for (i = 0; i < asyncQueue.length; i++) {
         item = asyncQueue[i];
         if (!item.callbacks)
           continue;
         error = item.callbacks.error;
-        if (typeof error === 'function')
-          handled = error(item.value, er) || handled;
+        if (typeof error === 'function') {
+          try {
+            handled = error(item.value, er) || handled;
+          } catch (er2) {
+            if (!errorString) {
+              errorString = 'Handler threw:\n' + er2.stack +
+                            '\n\nWhile handling error:\n' + er.stack;
+              errorHandler(er2);
+            } else {
+              process._exiting = true;
+              process.emit('exit', 1);
+              // There is no recovery throwing from here.
+              throw new Error(errorString);
+            }
+          }
+        }
       }
-      inErrorTick = false;
 
       // Unload the current queue from the stack.
-      // TODO(trevnorris): Did this to emulate domains, but why would it
-      // be necessary?
-      if (asyncStack.length > 0)
-        asyncQueue = asyncStack.pop();
-      else
-        asyncQueue.length = 0;
+      popQueue();
 
       // Also want to detect if we're in a listener/before/after callback
       // or else we might silently loose the error.
@@ -470,22 +481,22 @@
 
     // Used by AsyncWrap::AddAsyncListener() to add an individual listener
     // to the async queue. It will check the uid of the listener and only
-    // allow it to be added once. (gul => global unique listener)
-    function pushListener(gul) {
+    // allow it to be added once.
+    function pushListener(obj) {
       if (!this._asyncQueue)
         this._asyncQueue = [];
 
       var queue = this._asyncQueue;
       var inQueue = false;
       for (var i = 0; i < queue.length; i++) {
-        if (gul.uid === queue.uid) {
+        if (obj.uid === queue.uid) {
           inQueue = true;
           break;
         }
       }
 
       if (!inQueue)
-        queue.push(gul);
+        queue.push(obj);
     }
 
     // Used by AsyncWrap::RemoveAsyncListener() to remove an individual
