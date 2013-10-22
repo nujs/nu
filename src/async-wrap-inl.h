@@ -25,6 +25,8 @@
 #include "async-wrap.h"
 #include "env.h"
 #include "env-inl.h"
+#include "util.h"
+#include "util-inl.h"
 #include "v8.h"
 #include <assert.h>
 
@@ -197,7 +199,7 @@ inline void AsyncWrap::AddAsyncListener(
   assert(listener->IsObject());
   assert(handle->InternalFieldCount() > 0);
 
-  env->async_listener_push_function()->Call(args.This(), 1, &listener);
+  env->async_listener_push_function()->Call(handle, 1, &listener);
 
   TYPE* wrap = static_cast<TYPE*>(
       handle->GetAlignedPointerFromInternalField(0));
@@ -218,7 +220,7 @@ inline void AsyncWrap::RemoveAsyncListener(
   assert(handle->InternalFieldCount() > 0);
 
   v8::Local<v8::Value> ret =
-      env->async_listener_strip_function()->Call(args.This(), 1, &listener);
+      env->async_listener_strip_function()->Call(handle, 1, &listener);
 
   if (ret->IsFalse()) {
     TYPE* wrap = static_cast<TYPE*>(
