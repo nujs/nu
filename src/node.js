@@ -315,7 +315,7 @@
         // Passing the original value will allow users to manipulate the
         // original value object, while also allowing them to return a
         // new value for current async call tracking.
-        value = queueItem.listener(queueItem.value);
+        value = queueItem.listener(queueItem.value, context);
         if (typeof value !== 'undefined') {
           item = {
             callbacks: queueItem.callbacks,

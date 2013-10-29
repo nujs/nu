@@ -19,6 +19,7 @@
     'node_use_mdb%': 'false',
     'library_files': [
       'src/node.js',
+      'test.js',
       'lib/_debugger.js',
       'lib/_linklist.js',
       'lib/assert.js',
