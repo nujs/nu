@@ -282,7 +282,7 @@ class QueryWrap : public AsyncWrap {
       Integer::New(0, env()->isolate()),
       answer
     };
-    MakeCallback(env()->oncomplete_string(), ARRAY_SIZE(argv), argv);
+    MakeCallback<true>(env()->oncomplete_string(), ARRAY_SIZE(argv), argv);
   }
 
   void CallOnComplete(Local<Value> answer, Local<Value> family) {
@@ -293,7 +293,7 @@ class QueryWrap : public AsyncWrap {
       answer,
       family
     };
-    MakeCallback(env()->oncomplete_string(), ARRAY_SIZE(argv), argv);
+    MakeCallback<true>(env()->oncomplete_string(), ARRAY_SIZE(argv), argv);
   }
 
   void ParseError(int status) {
@@ -335,7 +335,7 @@ class QueryWrap : public AsyncWrap {
         arg = FIXED_ONE_BYTE_STRING(env()->isolate(), "UNKNOWN_ARES_ERROR");
         break;
     }
-    MakeCallback(env()->oncomplete_string(), 1, &arg);
+    MakeCallback<true>(env()->oncomplete_string(), 1, &arg);
   }
 
   // Subclasses should implement the appropriate Parse method.
@@ -888,7 +888,7 @@ void AfterGetAddrInfo(uv_getaddrinfo_t* req, int status, struct addrinfo* res) {
   uv_freeaddrinfo(res);
 
   // Make the callback into JavaScript
-  req_wrap->MakeCallback(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
+  req_wrap->MakeCallback<true>(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
 
   delete req_wrap;
 }

@@ -28,7 +28,14 @@
 namespace node {
 
 class AsyncWrap {
+  static const int kInternalFieldIndex = 0;
+
  public:
+  // FIXME(bnoordhuis) These methods are public only because the code base
+  // plays fast and loose with encapsulation.
+  template <typename TypeName>
+  inline static TypeName* Unwrap(v8::Local<v8::Object> object);
+
   enum AsyncFlags {
     NO_OPTIONS = 0,
     ASYNC_LISTENERS = 1
@@ -58,12 +65,15 @@ class AsyncWrap {
   inline v8::Persistent<v8::Object>& persistent();
 
   // Only call these within a valid HandleScope.
+  template <bool final>
   inline v8::Handle<v8::Value> MakeCallback(const v8::Handle<v8::Function> cb,
                                             int argc,
                                             v8::Handle<v8::Value>* argv);
+  template <bool final>
   inline v8::Handle<v8::Value> MakeCallback(const v8::Handle<v8::String> symbol,
                                             int argc,
                                             v8::Handle<v8::Value>* argv);
+  template <bool final>
   inline v8::Handle<v8::Value> MakeCallback(uint32_t index,
                                             int argc,
                                             v8::Handle<v8::Value>* argv);

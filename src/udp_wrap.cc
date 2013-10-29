@@ -373,7 +373,7 @@ void UDPWrap::OnSend(uv_udp_send_t* req, int status) {
     Context::Scope context_scope(env->context());
     HandleScope handle_scope(env->isolate());
     Local<Value> arg = Integer::New(status, node_isolate);
-    req_wrap->MakeCallback(env->oncomplete_string(), 1, &arg);
+    req_wrap->MakeCallback<true>(env->oncomplete_string(), 1, &arg);
   }
   delete req_wrap;
 }
@@ -420,14 +420,14 @@ void UDPWrap::OnRecv(uv_udp_t* handle,
   if (nread < 0) {
     if (buf->base != NULL)
       free(buf->base);
-    wrap->MakeCallback(env->onmessage_string(), ARRAY_SIZE(argv), argv);
+    wrap->MakeCallback<false>(env->onmessage_string(), ARRAY_SIZE(argv), argv);
     return;
   }
 
   char* base = static_cast<char*>(realloc(buf->base, nread));
   argv[2] = Buffer::Use(env, base, nread);
   argv[3] = AddressToJS(env, addr);
-  wrap->MakeCallback(env->onmessage_string(), ARRAY_SIZE(argv), argv);
+  wrap->MakeCallback<false>(env->onmessage_string(), ARRAY_SIZE(argv), argv);
 }
 
 

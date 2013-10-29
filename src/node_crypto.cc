@@ -851,7 +851,7 @@ int SSLWrap<Base>::NewSessionCallback(SSL* s, SSL_SESSION* sess) {
                                       reinterpret_cast<char*>(sess->session_id),
                                       sess->session_id_length);
   Local<Value> argv[] = { session, buff };
-  w->MakeCallback(env->onnewsession_string(), ARRAY_SIZE(argv), argv);
+  w->MakeCallback<false>(env->onnewsession_string(), ARRAY_SIZE(argv), argv);
 
   return 0;
 }
@@ -882,7 +882,7 @@ void SSLWrap<Base>::OnClientHello(void* arg,
   hello_obj->Set(env->tls_ticket_string(), Boolean::New(hello.has_ticket()));
 
   Local<Value> argv[] = { hello_obj };
-  w->MakeCallback(env->onclienthello_string(), ARRAY_SIZE(argv), argv);
+  w->MakeCallback<false>(env->onclienthello_string(), ARRAY_SIZE(argv), argv);
 }
 
 
@@ -1632,7 +1632,7 @@ int Connection::SelectSNIContextCallback_(SSL *s, int *ad, void* arg) {
       conn->sniContext_.Dispose();
 
       Local<Value> arg = PersistentToLocal(node_isolate, conn->servername_);
-      Local<Value> ret = conn->MakeCallback(env->onselect_string(), 1, &arg);
+      Local<Value> ret = conn->MakeCallback<false>(env->onselect_string(), 1, &arg);
 
       // If ret is SecureContext
       Local<FunctionTemplate> secure_context_constructor_template =
@@ -1751,11 +1751,11 @@ void Connection::SSLInfoCallback(const SSL *ssl_, int where, int ret) {
   HandleScope handle_scope(env->isolate());
 
   if (where & SSL_CB_HANDSHAKE_START) {
-    conn->MakeCallback(env->onhandshakestart_string(), 0, NULL);
+    conn->MakeCallback<false>(env->onhandshakestart_string(), 0, NULL);
   }
 
   if (where & SSL_CB_HANDSHAKE_DONE) {
-    conn->MakeCallback(env->onhandshakedone_string(), 0, NULL);
+    conn->MakeCallback<false>(env->onhandshakedone_string(), 0, NULL);
   }
 }
 
@@ -3374,7 +3374,7 @@ void EIO_PBKDF2After(uv_work_t* work_req, int status) {
   HandleScope handle_scope(env->isolate());
   Local<Value> argv[2];
   EIO_PBKDF2After(req, argv);
-  req->MakeCallback(env->ondone_string(), ARRAY_SIZE(argv), argv);
+  req->MakeCallback<true>(env->ondone_string(), ARRAY_SIZE(argv), argv);
   req->release();
   delete req;
 }
@@ -3591,7 +3591,7 @@ void RandomBytesAfter(uv_work_t* work_req, int status) {
   HandleScope handle_scope(env->isolate());
   Local<Value> argv[2];
   RandomBytesCheck(req, argv);
-  req->MakeCallback(env->ondone_string(), ARRAY_SIZE(argv), argv);
+  req->MakeCallback<true>(env->ondone_string(), ARRAY_SIZE(argv), argv);
   delete req;
 }
 

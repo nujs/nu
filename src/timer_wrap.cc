@@ -143,7 +143,7 @@ class TimerWrap : public HandleWrap {
     Context::Scope context_scope(env->context());
     HandleScope handle_scope(env->isolate());
     Local<Value> argv[1] = { Integer::New(status, node_isolate) };
-    wrap->MakeCallback(kOnTimeout, ARRAY_SIZE(argv), argv);
+    wrap->MakeCallback<false>(kOnTimeout, ARRAY_SIZE(argv), argv);
   }
 
   static void Now(const FunctionCallbackInfo<Value>& args) {

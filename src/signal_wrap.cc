@@ -104,7 +104,7 @@ class SignalWrap : public HandleWrap {
     HandleScope handle_scope(env->isolate());
 
     Local<Value> arg = Integer::New(signum, env->isolate());
-    wrap->MakeCallback(env->onsignal_string(), 1, &arg);
+    wrap->MakeCallback<false>(env->onsignal_string(), 1, &arg);
   }
 
   uv_signal_t handle_;

@@ -29,7 +29,9 @@
 namespace node {
 
 WeakObject::WeakObject(Environment* env, v8::Local<v8::Object> object)
-    : AsyncWrap(env, object) {
+    : object_(env->isolate(), object),
+      env_(env) {
+  assert(!object.IsEmpty());
   assert(object->InternalFieldCount() > 0);
   persistent().MarkIndependent();
   object->SetAlignedPointerInInternalField(kInternalFieldIndex, this);
@@ -37,6 +39,7 @@ WeakObject::WeakObject(Environment* env, v8::Local<v8::Object> object)
 }
 
 WeakObject::~WeakObject() {
+  assert(persistent().IsEmpty());
 }
 
 void WeakObject::MakeWeak() {
@@ -45,6 +48,18 @@ void WeakObject::MakeWeak() {
 
 void WeakObject::ClearWeak() {
   persistent().ClearWeak();
+}
+
+inline Environment* WeakObject::env() const {
+  return env_;
+}
+
+inline v8::Local<v8::Object> WeakObject::object() {
+  return PersistentToLocal(env()->isolate(), persistent());
+}
+
+inline v8::Persistent<v8::Object>& WeakObject::persistent() {
+  return object_;
 }
 
 template <typename TypeName>

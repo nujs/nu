@@ -338,7 +338,7 @@ void TCPWrap::OnConnection(uv_stream_t* handle, int status) {
     argv[1] = client_obj;
   }
 
-  tcp_wrap->MakeCallback(env->onconnection_string(), ARRAY_SIZE(argv), argv);
+  tcp_wrap->MakeCallback<false>(env->onconnection_string(), ARRAY_SIZE(argv), argv);
 }
 
 
@@ -364,7 +364,7 @@ void TCPWrap::AfterConnect(uv_connect_t* req, int status) {
     v8::True(node_isolate)
   };
 
-  req_wrap->MakeCallback(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
+  req_wrap->MakeCallback<true>(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
 
   delete req_wrap;
 }

@@ -32,6 +32,8 @@
 #endif
 
 #include "env.h"
+#include "async-wrap.h"
+#include "async-wrap-inl.h"
 #include "weak-object.h"
 #include "weak-object-inl.h"
 
@@ -214,7 +216,7 @@ class SSLWrap {
   friend class SecureContext;
 };
 
-class Connection : public SSLWrap<Connection>, public WeakObject {
+class Connection : public SSLWrap<Connection>, public AsyncWrap {
  public:
   static void Initialize(Environment* env, v8::Handle<v8::Object> target);
 
@@ -268,7 +270,7 @@ class Connection : public SSLWrap<Connection>, public WeakObject {
   void SetShutdownFlags();
 
   static Connection* Unwrap(v8::Local<v8::Object> object) {
-    Connection* conn = WeakObject::Unwrap<Connection>(object);
+    Connection* conn = AsyncWrap::Unwrap<Connection>(object);
     conn->ClearError();
     return conn;
   }
@@ -278,7 +280,7 @@ class Connection : public SSLWrap<Connection>, public WeakObject {
              SecureContext* sc,
              SSLWrap<Connection>::Kind kind)
       : SSLWrap<Connection>(env, sc, kind),
-        WeakObject(env, wrap),
+        AsyncWrap(env, wrap),
         bio_read_(NULL),
         bio_write_(NULL),
         hello_offset_(0) {

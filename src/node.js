@@ -334,9 +334,11 @@
     }
 
     // Uses the _asyncQueue object attached by runAsyncQueue.
-    function loadAsyncQueue(context) {
+    function loadAsyncQueue(context, isFinal) {
       var queue = context._asyncQueue;
       var item, before, i;
+
+      assert(isFinal !== undefined);
 
       asyncStack.push(asyncQueue);
       asyncQueue = queue;
@@ -353,15 +355,17 @@
           continue;
         before = item.callbacks.before;
         if (typeof before === 'function')
-          before(context, item.value);
+          before(context, item.value, isFinal);
       }
       inAsyncTick = false;
     }
 
     // Unload one level of the async stack. Returns true if there are
     // still listeners somewhere in the stack.
-    function unloadAsyncQueue(context) {
+    function unloadAsyncQueue(context, isFinal) {
       var item, after, i;
+
+      assert(isFinal !== undefined);
 
       // Run "after" callbacks.
       inAsyncTick = true;
@@ -371,7 +375,7 @@
           continue;
         after = item.callbacks.after;
         if (typeof after === 'function')
-          after(context, item.value);
+          after(context, item.value, isFinal);
       }
       inAsyncTick = false;
 
@@ -588,7 +592,7 @@
         threw = true;
         hasQueue = !!tock._asyncQueue;
         if (hasQueue)
-          _loadAsyncQueue(tock);
+          _loadAsyncQueue(tock, true);
         try {
           callback();
           threw = false;
@@ -597,7 +601,7 @@
             tickDone();
         }
         if (hasQueue)
-          _unloadAsyncQueue(tock);
+          _unloadAsyncQueue(tock, true);
       }
 
       tickDone();

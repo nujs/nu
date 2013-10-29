@@ -74,7 +74,7 @@ NODE_EXTERN v8::Local<v8::Value> UVException(int errorno,
                                              const char* syscall = NULL,
                                              const char* message = NULL,
                                              const char* path = NULL);
-NODE_EXTERN v8::Handle<v8::Value> MakeCallback(
+/*NODE_EXTERN v8::Handle<v8::Value> MakeCallback(
     const v8::Handle<v8::Object> recv,
     const char* method,
     int argc,
@@ -88,7 +88,7 @@ NODE_EXTERN v8::Handle<v8::Value> MakeCallback(
     const v8::Handle<v8::Object> object,
     const v8::Handle<v8::Function> callback,
     int argc,
-    v8::Handle<v8::Value>* argv);
+    v8::Handle<v8::Value>* argv);*/
 
 }  // namespace node
 

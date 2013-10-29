@@ -64,7 +64,7 @@ static void Delete(uv_handle_t* handle) {
 
 
 StatWatcher::StatWatcher(Environment* env, Local<Object> wrap)
-    : WeakObject(env, wrap),
+    : AsyncWrap(env, wrap),
       watcher_(new uv_fs_poll_t) {
   uv_fs_poll_init(env->event_loop(), watcher_);
   watcher_->data = static_cast<void*>(this);
@@ -91,7 +91,7 @@ void StatWatcher::Callback(uv_fs_poll_t* handle,
     BuildStatsObject(env, prev),
     Integer::New(status, node_isolate)
   };
-  wrap->MakeCallback(env->onchange_string(), ARRAY_SIZE(argv), argv);
+  wrap->MakeCallback<false>(env->onchange_string(), ARRAY_SIZE(argv), argv);
 }
 
 
@@ -107,7 +107,7 @@ void StatWatcher::Start(const FunctionCallbackInfo<Value>& args) {
   assert(args.Length() == 3);
   HandleScope scope(node_isolate);
 
-  StatWatcher* wrap = WeakObject::Unwrap<StatWatcher>(args.This());
+  StatWatcher* wrap = Unwrap<StatWatcher>(args.This());
   String::Utf8Value path(args[0]);
   const bool persistent = args[1]->BooleanValue();
   const uint32_t interval = args[2]->Uint32Value();
@@ -115,16 +115,16 @@ void StatWatcher::Start(const FunctionCallbackInfo<Value>& args) {
   if (!persistent)
     uv_unref(reinterpret_cast<uv_handle_t*>(wrap->watcher_));
   uv_fs_poll_start(wrap->watcher_, Callback, *path, interval);
-  wrap->ClearWeak();
+  //wrap->ClearWeak();
 }
 
 
 void StatWatcher::Stop(const FunctionCallbackInfo<Value>& args) {
-  StatWatcher* wrap = WeakObject::Unwrap<StatWatcher>(args.This());
+  StatWatcher* wrap = Unwrap<StatWatcher>(args.This());
   Environment* env = wrap->env();
   Context::Scope context_scope(env->context());
   HandleScope handle_scope(env->isolate());
-  wrap->MakeCallback(env->onstop_string(), 0, NULL);
+  wrap->MakeCallback<false>(env->onstop_string(), 0, NULL);
   wrap->Stop();
 }
 
@@ -133,7 +133,7 @@ void StatWatcher::Stop() {
   if (!uv_is_active(reinterpret_cast<uv_handle_t*>(watcher_)))
     return;
   uv_fs_poll_stop(watcher_);
-  MakeWeak();
+  //MakeWeak();
 }
 
 

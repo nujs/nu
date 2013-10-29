@@ -242,7 +242,7 @@ void TLSCallbacks::SSLInfoCallback(const SSL* ssl_, int where, int ret) {
   if (where & SSL_CB_HANDSHAKE_START) {
     Local<Value> callback = object->Get(env->onhandshakestart_string());
     if (callback->IsFunction()) {
-      c->MakeCallback(callback.As<Function>(), 0, NULL);
+      c->MakeCallback<false>(callback.As<Function>(), 0, NULL);
     }
   }
 
@@ -250,7 +250,7 @@ void TLSCallbacks::SSLInfoCallback(const SSL* ssl_, int where, int ret) {
     c->established_ = true;
     Local<Value> callback = object->Get(env->onhandshakedone_string());
     if (callback->IsFunction()) {
-      c->MakeCallback(callback.As<Function>(), 0, NULL);
+      c->MakeCallback<false>(callback.As<Function>(), 0, NULL);
     }
   }
 }
@@ -313,7 +313,7 @@ void TLSCallbacks::EncOutCb(uv_write_t* req, int status) {
     Local<Value> arg = String::Concat(
         FIXED_ONE_BYTE_STRING(node_isolate, "write cb error, status: "),
         Integer::New(status, node_isolate)->ToString());
-    callbacks->MakeCallback(env->onerror_string(), 1, &arg);
+    callbacks->MakeCallback<true>(env->onerror_string(), 1, &arg);
     callbacks->InvokeQueued(status);
     return;
   }
@@ -381,7 +381,7 @@ void TLSCallbacks::ClearOut() {
         Integer::New(read, node_isolate),
         Buffer::New(env(), out, read)
       };
-      wrap()->MakeCallback(env()->onread_string(), ARRAY_SIZE(argv), argv);
+      wrap()->MakeCallback<false>(env()->onread_string(), ARRAY_SIZE(argv), argv);
     }
   } while (read > 0);
 
@@ -390,7 +390,7 @@ void TLSCallbacks::ClearOut() {
     Handle<Value> arg = GetSSLError(read, &err);
 
     if (!arg.IsEmpty()) {
-      MakeCallback(env()->onerror_string(), 1, &arg);
+      MakeCallback<true>(env()->onerror_string(), 1, &arg);
     }
   }
 }
@@ -425,7 +425,7 @@ bool TLSCallbacks::ClearIn() {
   int err;
   Handle<Value> arg = GetSSLError(written, &err);
   if (!arg.IsEmpty()) {
-    MakeCallback(env()->onerror_string(), 1, &arg);
+    MakeCallback<true>(env()->onerror_string(), 1, &arg);
   }
 
   return false;
@@ -488,7 +488,7 @@ int TLSCallbacks::DoWrite(WriteWrap* w,
     HandleScope handle_scope(env()->isolate());
     Handle<Value> arg = GetSSLError(written, &err);
     if (!arg.IsEmpty()) {
-      MakeCallback(env()->onerror_string(), 1, &arg);
+      MakeCallback<true>(env()->onerror_string(), 1, &arg);
       return -1;
     }
 
@@ -527,7 +527,7 @@ void TLSCallbacks::DoRead(uv_stream_t* handle,
     Context::Scope context_scope(env()->context());
     HandleScope handle_scope(env()->isolate());
     Local<Value> arg = Integer::New(nread, node_isolate);
-    wrap()->MakeCallback(env()->onread_string(), 1, &arg);
+    wrap()->MakeCallback<false>(env()->onread_string(), 1, &arg);
     return;
   }
 

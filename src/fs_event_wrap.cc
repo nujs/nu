@@ -169,7 +169,7 @@ void FSEventWrap::OnEvent(uv_fs_event_t* handle, const char* filename,
     argv[2] = OneByteString(node_isolate, filename);
   }
 
-  wrap->MakeCallback(env->onchange_string(), ARRAY_SIZE(argv), argv);
+  wrap->MakeCallback<false>(env->onchange_string(), ARRAY_SIZE(argv), argv);
 }
 
 

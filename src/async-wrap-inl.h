@@ -104,6 +104,7 @@ inline v8::Persistent<v8::Object>& AsyncWrap::persistent() {
 }
 
 
+template <bool final>
 inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
     const v8::Handle<v8::Function> cb,
     int argc,
@@ -112,13 +113,18 @@ inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
 
   v8::Local<v8::Object> context = object();
   v8::Local<v8::Object> process = env()->process_object();
+  v8::Local<v8::Value> async_queue_argv[2];
+
+  if (has_async_queue()) {
+    async_queue_argv[0] = context.As<v8::Value>();
+    async_queue_argv[1] = v8::Boolean::New(final);
+  }
 
   v8::TryCatch try_catch;
   try_catch.SetVerbose(true);
 
   if (has_async_queue()) {
-    v8::Local<v8::Value> val = context.As<v8::Value>();
-    env()->async_listener_load_function()->Call(process, 1, &val);
+    env()->async_listener_load_function()->Call(process, 2, async_queue_argv);
 
     if (try_catch.HasCaught())
       return v8::Undefined(env()->isolate());
@@ -132,7 +138,7 @@ inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
 
   if (has_async_queue()) {
     v8::Local<v8::Value> val = context.As<v8::Value>();
-    env()->async_listener_unload_function()->Call(process, 1, &val);
+    env()->async_listener_unload_function()->Call(process, 2, async_queue_argv);
   }
 
   Environment::TickInfo* tick_info = env()->tick_info();
@@ -164,6 +170,7 @@ inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
 }
 
 
+template <bool final>
 inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
     const v8::Handle<v8::String> symbol,
     int argc,
@@ -172,10 +179,11 @@ inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
   v8::Local<v8::Function> cb = cb_v.As<v8::Function>();
   assert(cb->IsFunction());
 
-  return MakeCallback(cb, argc, argv);
+  return MakeCallback<final>(cb, argc, argv);
 }
 
 
+template <bool final>
 inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
     uint32_t index,
     int argc,
@@ -184,7 +192,7 @@ inline v8::Handle<v8::Value> AsyncWrap::MakeCallback(
   v8::Local<v8::Function> cb = cb_v.As<v8::Function>();
   assert(cb->IsFunction());
 
-  return MakeCallback(cb, argc, argv);
+  return MakeCallback<final>(cb, argc, argv);
 }
 
 
@@ -228,6 +236,15 @@ inline void AsyncWrap::RemoveAsyncListener(
     assert(wrap != NULL);
     wrap->remove_flag(ASYNC_LISTENERS);
   }
+}
+
+template <typename TypeName>
+TypeName* AsyncWrap::Unwrap(v8::Local<v8::Object> object) {
+  // Cast to AsyncWrap* before casting to TypeName* avoids issues with classes
+  // that have multiple base classes.
+  void* p = object->GetAlignedPointerFromInternalField(kInternalFieldIndex);
+  AsyncWrap* w = static_cast<AsyncWrap*>(p);
+  return static_cast<TypeName*>(w);
 }
 
 }  // namespace node

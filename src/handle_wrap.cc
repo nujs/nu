@@ -123,7 +123,7 @@ void HandleWrap::OnClose(uv_handle_t* handle) {
   Local<Object> object = wrap->object();
 
   if (wrap->flags_ & kCloseCallback) {
-    wrap->MakeCallback(env->close_string(), 0, NULL);
+    wrap->MakeCallback<true>(env->close_string(), 0, NULL);
   }
 
   object->SetAlignedPointerInInternalField(0, NULL);

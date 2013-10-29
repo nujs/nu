@@ -457,7 +457,7 @@ void StreamWrap::AfterWrite(uv_write_t* req, int status) {
     req_wrap_obj
   };
 
-  req_wrap->MakeCallback(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
+  req_wrap->MakeCallback<true>(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
 
   req_wrap->~WriteWrap();
   delete[] reinterpret_cast<char*>(req_wrap);
@@ -502,7 +502,7 @@ void StreamWrap::AfterShutdown(uv_shutdown_t* req, int status) {
     req_wrap_obj
   };
 
-  req_wrap->MakeCallback(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
+  req_wrap->MakeCallback<true>(env->oncomplete_string(), ARRAY_SIZE(argv), argv);
 
   delete req_wrap;
 }
@@ -573,7 +573,7 @@ void StreamWrapCallbacks::DoRead(uv_stream_t* handle,
   if (nread < 0)  {
     if (buf->base != NULL)
       free(buf->base);
-    wrap()->MakeCallback(env->onread_string(), ARRAY_SIZE(argv), argv);
+    wrap()->MakeCallback<false>(env->onread_string(), ARRAY_SIZE(argv), argv);
     return;
   }
 
@@ -602,7 +602,7 @@ void StreamWrapCallbacks::DoRead(uv_stream_t* handle,
     argv[2] = pending_obj;
   }
 
-  wrap()->MakeCallback(env->onread_string(), ARRAY_SIZE(argv), argv);
+  wrap()->MakeCallback<false>(env->onread_string(), ARRAY_SIZE(argv), argv);
 }
 
 

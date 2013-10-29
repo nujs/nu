@@ -22,18 +22,19 @@
 #ifndef SRC_WEAK_OBJECT_H_
 #define SRC_WEAK_OBJECT_H_
 
-#include "async-wrap.h"
 #include "env.h"
 #include "v8.h"
 
 namespace node {
 
-class WeakObject : public AsyncWrap {
+class WeakObject {
  public:
   // FIXME(bnoordhuis) These methods are public only because the code base
   // plays fast and loose with encapsulation.
   template <typename TypeName>
   inline static TypeName* Unwrap(v8::Local<v8::Object> object);
+  inline Environment* env() const;
+
  protected:
   // |object| should be an instance of a v8::ObjectTemplate that has at least
   // one internal field reserved with v8::ObjectTemplate::SetInternalFieldCount.
@@ -41,11 +42,21 @@ class WeakObject : public AsyncWrap {
   virtual inline ~WeakObject();
   inline void MakeWeak();
   inline void ClearWeak();
+
+  // Returns the wrapped object.  Illegal to call in your destructor.
+  inline v8::Local<v8::Object> object();
+
+  // Parent class is responsible to Dispose.
+  inline v8::Persistent<v8::Object>& persistent();
+
  private:
   inline static void WeakCallback(v8::Isolate* isolate,
                                   v8::Persistent<v8::Object>* persistent,
                                   WeakObject* self);
   static const int kInternalFieldIndex = 0;
+
+  v8::Persistent<v8::Object> object_;
+  Environment* const env_;
 };
 
 }  // namespace node
