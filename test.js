@@ -3,6 +3,8 @@ var inherits = require('util').inherits;
 var format = require('util').format;
 var assert = require('assert');
 var net = require('net');
+var util = require('util');
+
 process.stdout;
 process.stderr;
 
@@ -40,7 +42,7 @@ function EventSource(name) {
     this.depth = 0;
     return;
   }
-  
+
   this.domain = current;
   this.depth = current.depth + 1;
 
@@ -48,7 +50,7 @@ function EventSource(name) {
   current.addRef(this);
   this._refed = true;
 
-  print('%s%s created', tab(this.depth), this.name); 
+  print('%s%s created', tab(this.depth), this.name);
 }
 EventSource._isRoot = false;
 
@@ -63,7 +65,7 @@ inherits(Domain, EventSource);
 Domain.prototype.addRef = function addRef(item) {
   print('%s%s referenced by %s: %d -> %d', tab(this.depth), this.name, item.name, this._refs, this._refs + 1);
   ++this._refs;
-  this._refIndex[item.uid] = item; 
+  this._refIndex[item.uid] = item;
 }
 Domain.prototype.delRef = function delRef(item) {
   print('%s%s dereferenced by %s: %d -> %d', tab(this.depth), this.name, item.name, this._refs, this._refs - 1);
@@ -99,7 +101,17 @@ Domain.prototype._callFinalizers = function(method, err) {
       delete finalizers[uid];
   }
 }
-
+Domain.prototype._apply = function Domain$_apply(fn, self, args) {
+  var prev = current;
+  var rv;
+  current = this;
+  try {
+    rv = fn.apply(self, args);
+  } finally {
+    current = prev;
+  }
+  return rv;
+}
 Domain.prototype.link = function(fn) {
   if (this === current)
     return fn;
@@ -118,8 +130,8 @@ Domain.prototype.link = function(fn) {
     target.delRef(wrapped);
 
     target.removeFinalizer(wrapped);
-    source.removeFinalizer(wrapped);    
-    
+    source.removeFinalizer(wrapped);
+
     var prev = current;
     current = target;
     fn.apply(this, argument);
@@ -211,7 +223,7 @@ Task.prototype.delRef = function(item) {
 Task.prototype.check = function() {
   assert(current === this.domain);
   this._checkScheduled = false;
-  
+
   if (this._refs !== 0)
     return;
 
@@ -295,30 +307,108 @@ t.setCallback(function(err, result) {
 function EventEmitter() {
   this.domain = current;
   this._done = false;
-
   this._listeningDomains = {};
+  this._events = {};
 }
 
-EventEmitter.prototype._checkDone() {
+EventEmitter.prototype._checkDone = function() {
   if (this._done)
     throw new Error("This EventEmitter is done");
 }
 
-EventEmitter.prototype.on = function(event, cb) {
-  this._checkDone();
+EventEmitter.prototype._addListenerInternal = function(event, listener, once) {
+  if (!util.isFunction(listener))
+    throw TypeError('listener must be a function');
 
-  var source = current;
-  
+    this._checkDone();
+
+  var listeningDomains = this._listeningDomains,
+      events = this._events;
+
+  if (!listeningDomains[current.uid])
+    listeningDomains[current.uid] = { count: 1, domain: current };
+  else
+    listeningDomains[current.uid].count++;
+
+  if (!events[event])
+    events[event] = [];
+
+  events[event].push({ domain: current, listener: listener, once: once});
 }
 
-EventEmitter.prototype.once = function(event, cb) {
-  this._checkDone();
+EventEmitter.prototype.on = function(event, listener) {
+  return this._addListenerInternal(event, listener, false);
+}
+
+EventEmitter.prototype.addListener = function(event, listener) {
+  return this._addListenerInternal(event, listener, false);
+}
+
+EventEmitter.prototype.once = function(event, listener) {
+  return this._addListenerInternal(event, listener, true);
+}
+
+EventEmitter.prototype._afterRemoveListener = function(event, info) {
+  if (!--this._listeningDomains[info.domain.uid].count) {
+    delete this._listeningDomains[info.domain.uid];
+    this._detachDomain(info.domain);
+  }
+
+  this.emit('removeListener', event, info.listener);
 }
 
 EventEmitter.prototype.emit = function(event, err) {
   this._checkDone();
 
+  var events = this._events,
+      listeners = (events[event] || []),
+      listenersCopy = listeners.slice(),
+      args = Array.prototype.slice.call(arguments, 1);
 
+  for (var i = 0; i < listenersCopy.length; i++) {
+    var info = listenersCopy[i];
+
+    info.domain._apply(info.listener, info.domain, args);
+
+    if (info.once) {
+      var index = listeners.indexOf(info);
+      if (index !== -1) {
+        listeners.splice(index, 1);
+        this._afterRemoveListener(event, info);
+      }
+    }
+  }
 }
 
-EventEmitter.prototype.emit
+
+EventEmitter.prototype.removeListener = function(event, listener) {
+  this._checkDone();
+
+  var events = this._events,
+      listeners = this._events[event] || [];
+
+  for (var i = 0; i < listeners.length; i++) {
+    var info = listeners[i];
+
+    if (info.listener === listener) {
+      listeners.splice(index, 1);
+      this._afterRemoveListener(event, info);
+      break;
+    }
+  }
+}
+
+
+
+var testEmitter = new EventEmitter();
+
+testEmitter.on('test', function(a, b) {
+  console.log('test event %s %s', a, b);
+});
+
+testEmitter.once('test', function(c, d) {
+  console.log('test once %s %s', c, d);
+});
+
+testEmitter.emit('test', 'foo', 3);
+testEmitter.emit('test', 'bar', 4);
