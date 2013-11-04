@@ -57,6 +57,7 @@ function Domain(name) {
   var self = this;
   this._refs = 0;
   this._refIndex = {};
+  this._finalizers = {};
 }
 inherits(Domain, EventSource);
 Domain.prototype.addRef = function addRef(item) {
@@ -74,6 +75,70 @@ Domain.prototype.delRef = function delRef(item) {
   }
   print('%s- left: %s', tab(this.depth), left.join(', '));
 }
+Domain.prototype.addFinalizer = function(finalizer) {
+  var uid = finalizer.uid;
+  assert(typeof uid === 'number');
+  assert(!this._finalizers[uid]);
+  this._finalizers[uid] = finalizer;
+}
+Domain.prototype.removeFinalizer = function(finalizer) {
+  var uid = finalizer.uid;
+  assert(typeof uid === 'number');
+  assert(this._finalizers[uid]);
+  delete this._finalizers[uid];
+}
+Domain.prototype._callFinalizers = function(method, err) {
+  var finalizers = this._finalizers;
+  for (var uid in finalizers) {
+    if (!finalizers.hasOwnProperty(uid))
+      continue;
+    var finalizer = finalizers[uid];
+    if (!finalizer[method])
+      continue;
+    if (finalizer[method](err))
+      delete finalizers[uid];
+  }
+}
+
+Domain.prototype.link = function(fn) {
+  if (this === current)
+    return fn;
+
+  var target = current;
+  var source = this;
+  var done = false;
+
+  function wrapped() {
+    if (done) {
+      throw new Exception('Callback already made');
+    }
+
+    done = true;
+
+    target.delRef(wrapped);
+
+    target.removeFinalizer(wrapped);
+    source.removeFinalizer(wrapped);    
+    
+    var prev = current;
+    current = target;
+    fn.apply(this, argument);
+    current = prev;
+  }
+
+  wrapped.uid = ++uid;
+
+  wrapped.unlink = function(err) {
+    wrapped(err || new Error('Callback source domain exited'));
+  }
+
+  target.addRef(wrapped);
+  target.addFinalizer(wrapped);
+  source.addFinalizer(wrapped);
+
+  return wrapped;
+}
+
 Domain.prototype.throw = function(err) {
   throw err;
 }
@@ -208,7 +273,6 @@ var t = new Task(function TestTask(done) {
       clearInterval(x);
   }, 100);
 
-
   setImmediate(function() {
     print("immediate");
   });
@@ -228,7 +292,33 @@ t.setCallback(function(err, result) {
   });
 });
 
+function EventEmitter() {
+  this.domain = current;
+  this._done = false;
 
-function Resource() {
+  this._listeningDomains = {};
+}
+
+EventEmitter.prototype._checkDone() {
+  if (this._done)
+    throw new Error("This EventEmitter is done");
+}
+
+EventEmitter.prototype.on = function(event, cb) {
+  this._checkDone();
+
+  var source = current;
+  
+}
+
+EventEmitter.prototype.once = function(event, cb) {
+  this._checkDone();
+}
+
+EventEmitter.prototype.emit = function(event, err) {
+  this._checkDone();
+
 
 }
+
+EventEmitter.prototype.emit
