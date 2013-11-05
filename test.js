@@ -152,7 +152,10 @@ Domain.prototype.link = function(fn) {
 }
 
 Domain.prototype.throw = function(err) {
-  throw err;
+  if (this.finish)
+    this.finish(err);
+  else
+    throw err;
 }
 
 function RootDomain() {
@@ -201,6 +204,7 @@ Task.prototype.run = function(cb) {
   }
 
 }
+
 Task.prototype.addRef = function(item) {
   Domain.prototype.addRef.call(this, item);
 }
@@ -271,12 +275,15 @@ function after(context, value, isFinal) {
 }
 
 process.on('uncaughtException', function(err) {
-  console.log('uncaught');
+  console.log('uncaught', err);
+  print(err.stack);
   current.throw(err);
 });
 
 process.addAsyncListener(pre, { before: before, after: after });
 
+
+/* 
 var t = new Task(function TestTask(done) {
   var x = setInterval(function() {
     print("interval");
@@ -304,16 +311,33 @@ t.setCallback(function(err, result) {
   });
 });
 
+*/
+
 function EventEmitter() {
   this.domain = current;
   this._done = false;
   this._listeningDomains = {};
   this._events = {};
+  this.uid = ++uid;
+
+  this.domain.addFinalizer(this);
 }
 
 EventEmitter.prototype._checkDone = function() {
   if (this._done)
     throw new Error("This EventEmitter is done");
+}
+
+EventEmitter.prototype._attachDomain = function EventEmitter$_attachDomain(domain) {
+  print('Attaching domain %s', domain.uid);
+  domain.addRef(this);
+  domain.addFinalizer(this);
+}
+
+EventEmitter.prototype._detachDomain = function EventEmitter$_detachDomain(domain) {
+  print('Detaching domain %s', domain.uid);
+  domain.delRef(this);
+  domain.removeFinalizer(this);
 }
 
 EventEmitter.prototype._addListenerInternal = function(event, listener, once) {
@@ -325,9 +349,12 @@ EventEmitter.prototype._addListenerInternal = function(event, listener, once) {
   var listeningDomains = this._listeningDomains,
       events = this._events;
 
-  if (!listeningDomains[current.uid])
+  if (!listeningDomains[current.uid]) {
     listeningDomains[current.uid] = { count: 1, domain: current };
-  else
+    if (current !== this.domain)
+      // Don't attach to the parent.
+      this._attachDomain(current);
+  } else
     listeningDomains[current.uid].count++;
 
   if (!events[event])
@@ -351,7 +378,9 @@ EventEmitter.prototype.once = function(event, listener) {
 EventEmitter.prototype._afterRemoveListener = function(event, info) {
   if (!--this._listeningDomains[info.domain.uid].count) {
     delete this._listeningDomains[info.domain.uid];
-    this._detachDomain(info.domain);
+    // Don't detach from the parent.
+    if (this.domain !== info.domain)
+      this._detachDomain(info.domain);
   }
 
   this.emit('removeListener', event, info.listener);
@@ -391,24 +420,115 @@ EventEmitter.prototype.removeListener = function(event, listener) {
     var info = listeners[i];
 
     if (info.listener === listener) {
-      listeners.splice(index, 1);
+      listeners.splice(i, 1);
       this._afterRemoveListener(event, info);
       break;
     }
   }
 }
 
+EventEmitter.prototype.removeAllListeners = function EventEmitter$removeAllListeners(type) {
+  var events = this._events;
+
+  if (type == null) {
+    var types = Object.keys(events);
+    for (var i = 0; i < types.length; i++) {
+      type = types[i];
+      if (type !== 'removeListener')
+        this.removeAllListeners(type);
+    }
+    return this.removeAllListeners[type];
+  }
+
+  var listeners = this._events[type] || [];
+
+  while (listeners.length) {
+    this._afterRemoveListener(type, listeners[listeners.length - 1]);
+    listeners.length--;
+  }
+
+  return this;
+}
+
+EventEmitter.prototype.finish = function EventEmitter$finish(err) {
+  this._checkDone();
+ 
+  if (!err)
+    return void this.removeAllListeners();
+  
+  var listeningDomains = this._listeningDomains;
+  var unhandledListeners = {};
+  var handledByParent = false;
+  for (var uid in listeningDomains) {
+    if (!listeningDomains.hasOwnProperty(uid))
+      continue;
+    unhandledListeners[uid] = listeningDomains[uid].domain;
+  }
+
+  var errorListeners = this._events['error'] || [],
+      errorListenersCopy = errorListeners.slice();
+
+  for (var i = 0; i < errorListenersCopy.length; i++) {
+    var info = errorListenersCopy[i];
+    delete unhandledListeners[info.domain.uid];
+    if (info.domain === this.domain)
+      handledByParent = true;
+    info.domain._apply(info.listener, info.domain, [err]);
+  }
+
+  for (var uid in unhandledListeners) {
+    if (!unhandledListeners.hasOwnProperty(uid))
+      continue;
+    unhandledListeners[uid].throw(err);
+  }
+
+  if (!handledByParent)
+    this.parent.throw(err);
+
+  this.removeAllListeners();
+  this._done = true;
+}
+
+EventEmitter.prototype._ontaskcomplete = function(domain, err) {
+  // This shouldn't be called when done because all finalizers should be removed.
+  assert(!this._done);
+
+  if (domain == this.domain || err)
+    this.finish(err);
+}
+
+EventEmitter.prototype._ontaskexit = function(domain, err) {
+  // This should only happen from the parent domain since all other domains are ref'ed.
+  assert(domain === this.domain);
+  this.finish(err);
+}
 
 
 var testEmitter = new EventEmitter();
 
 testEmitter.on('test', function(a, b) {
   console.log('test event %s %s', a, b);
+  //if (b === 4)
+  //  testEmitter.removeListener('test', arguments.callee);
 });
 
 testEmitter.once('test', function(c, d) {
   console.log('test once %s %s', c, d);
 });
 
+
+new Task(function EmitterTestTask(done) {
+  testEmitter.on('test', function() {
+    print('EmitterTestTask got event!');
+  });
+}).setCallback(function(err) {
+  console.log('EmitterTestTask result: ', err);
+});
+
+testEmitter.on('error', function(err) {
+  console.log('process handled emitter error', err);
+});
+
 testEmitter.emit('test', 'foo', 3);
 testEmitter.emit('test', 'bar', 4);
+//testEmitter.finish(new Error('foo!'));
