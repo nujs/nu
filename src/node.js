@@ -241,7 +241,7 @@
           // nothing to be done about it at this point.
         }
 
-      // if we handled an error, then make sure any ticks get processed
+        // if we handled an error, then make sure any ticks get processed
       } else {
         setImmediate(process._tickCallback);
       }
